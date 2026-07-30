@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.python-version
+
+# Output
+output/
+runs/
+*.cache
+
+# Videos and large media
+*.mp4
+*.mov
+*.avi
+*.heic
+*.png
+*.jpg
+*.jpeg
+
+# Models and large files
+*.pt
+*.pth
+*.onnx
+*.cache
+
+# Experiment outputs
+*.json
+真实视频/
+真实场景图/
+测试视频*/
+yolo_book_dataset/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
