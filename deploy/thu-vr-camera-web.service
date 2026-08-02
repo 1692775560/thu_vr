@@ -1,0 +1,34 @@
+[Unit]
+Description=THU VR dual-camera OCR web dashboard
+After=network.target controller.service
+Wants=controller.service
+
+[Service]
+Type=simple
+User=unix_ai
+Group=unix_ai
+WorkingDirectory=/home/unix_ai/thu_vr
+EnvironmentFile=/home/unix_ai/config/ros_domain_id.env
+Environment=THU_VR_WEB_PORT=5090
+Environment=THU_VR_UPSTREAM_URL=http://127.0.0.1:5000
+Environment=THU_VR_RAW_MAX_FPS=2
+Environment=THU_VR_OCR_SUBMIT_INTERVAL=2
+Environment=THU_VR_OCR_MIN_INTERVAL=2
+Environment=THU_VR_OCR_THREADS=2
+Environment=THU_VR_OCR_FAST_MODE=1
+Environment=THU_VR_OCR_TEMPORAL_WINDOW=5
+Environment=THU_VR_LABEL_ROW_PREFIX_STEP=-1
+Environment=THU_VR_LABEL_ROW_PREFIX_ALLOW_SINGLE_ANCHOR=0
+# Prefix letters and the 0000..9999 serial range are learned from pixels.
+ExecStart=/home/unix_ai/thu_vr/start_camera_web.sh
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+Nice=10
+CPUQuota=300%
+MemoryMax=4G
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

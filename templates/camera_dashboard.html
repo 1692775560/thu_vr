@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wanda 双相机视觉</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='camera_dashboard.css') }}">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">WANDA VISION CONSOLE</p>
+        <h1>双相机实时视觉</h1>
+        <p class="subtitle">原画实时传输 · OCR 标注异步刷新 · 只处理最新帧</p>
+      </div>
+      <div class="system-status">
+        <span class="pulse"></span>
+        <span id="system-copy">正在连接机器人…</span>
+      </div>
+    </header>
+
+    <section class="camera-summary">
+      {% for key, camera in cameras.items() %}
+      <article class="camera-chip" data-camera="{{ key }}">
+        <div>
+          <span class="camera-name">{{ camera.label }}</span>
+          <span class="camera-topic">{{ camera.topic }}</span>
+        </div>
+        <div class="camera-metrics">
+          <span id="{{ key }}-online" class="state-pill offline">离线</span>
+          <span id="{{ key }}-fps">0.0 FPS</span>
+          <span id="{{ key }}-resolution">—</span>
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+
+    <section class="vision-grid">
+      {% for key, camera in cameras.items() %}
+      <article class="vision-card">
+        <div class="card-heading">
+          <div>
+            <span class="card-kicker">{{ camera.label }}</span>
+            <h2>原始画面</h2>
+          </div>
+          <span class="mode-tag live">LIVE</span>
+        </div>
+        <div class="video-frame">
+          <img data-stream="/stream/{{ key }}/raw" alt="{{ camera.label }}原始画面">
+          <span class="corner-label">RAW</span>
+        </div>
+        <div class="card-footer"><span>实时 MJPEG</span><span id="{{ key }}-age">等待首帧</span></div>
+      </article>
+
+      <article class="vision-card annotated-card">
+        <div class="card-heading">
+          <div>
+            <span class="card-kicker">{{ camera.label }}</span>
+            <h2>OCR 标注画面</h2>
+          </div>
+          <span class="mode-tag ai">OCR</span>
+        </div>
+        <div class="video-frame">
+          <img data-stream="/stream/{{ key }}/annotated" alt="{{ camera.label }}标注画面">
+          <span class="corner-label">ANNOTATED</span>
+        </div>
+        <div class="card-footer">
+          <span id="{{ key }}-ocr-count">等待识别</span>
+          <span id="{{ key }}-ocr-time">—</span>
+        </div>
+        <div id="{{ key }}-codes" class="code-strip"><span class="empty-code">等待标签结果</span></div>
+      </article>
+      {% endfor %}
+    </section>
+
+    <section class="experiment-panel">
+      <div class="experiment-heading">
+        <div>
+          <p class="eyebrow">ABLATION RECORDER</p>
+          <h2>消融实验采样</h2>
+          <p class="subtitle">同一条件同时保存头部/底部相机原始帧；实际头部角度、底盘里程计和时间戳自动记录。</p>
+        </div>
+        <span id="experiment-state" class="state-pill online">等待采样</span>
+      </div>
+      <div class="ground-truth-note">
+        <span>现场真值</span>
+        <code>行前缀现场填写（A–Z）</code>
+        <code>每行 0010 → 0020</code>
+        <code>格式：字母 + 两位数 + 四位编号</code>
+      </div>
+      <div class="ablation-method-note">
+        <strong>现场选型只看“可部署”方案</strong>
+        <span>它们只使用图像、统一标签格式和跨帧证据；蓝色“实验上限”方案使用人工真值，只作为对照，不进入现场算法。</span>
+      </div>
+      <form id="experiment-form" class="experiment-form">
+        <label>
+          <span>标签距离（m）</span>
+          <input id="experiment-distance" name="distance_m" type="number" min="0.05" max="20" step="0.01" required placeholder="例如 1.50">
+        </label>
+        <label>
+          <span>每个相机帧数</span>
+          <input id="experiment-frame-count" name="frame_count" type="number" min="3" max="30" step="1" value="10" required>
+        </label>
+        <label>
+          <span>头部相机可见行（从上到下）</span>
+          <input id="head-target-rows" name="head_target_rows" type="text" value="A05,A04" required placeholder="例如 B05,B04 或 N03,N02">
+        </label>
+        <label>
+          <span>底部相机可见行（从上到下）</span>
+          <input id="base-target-rows" name="base_target_rows" type="text" value="A02,A01" required placeholder="例如 B02,B01 或 N01">
+        </label>
+        <label class="notes-field">
+          <span>备注（可选）</span>
+          <input id="experiment-notes" name="notes" type="text" maxlength="500" placeholder="光照、遮挡或位置说明">
+        </label>
+        <button id="experiment-capture" type="submit">记录当前实验点</button>
+      </form>
+      <div id="experiment-result" class="experiment-result">尚未记录本轮条件。</div>
+      <div>
+        <h3>实验记录（每 2 秒自动更新）</h3>
+        <div id="recent-trials" class="recent-trials"><span class="empty-code">暂无采样</span></div>
+      </div>
+    </section>
+  </main>
+  <script src="{{ url_for('static', filename='camera_dashboard.js') }}?v=20260802-motion-temporal-v4.0"></script>
+</body>
+</html>
