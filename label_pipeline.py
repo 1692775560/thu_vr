@@ -68,6 +68,8 @@ ROW_SUPPORT_SHARE = 0.15
 # handful of folds is exactly what produces one.
 ISOLATED_ROW_MAX_SLOTS = 4
 ISOLATED_ROW_MAX_RESOLVED = 1
+ISOLATED_ROW_MIN_READ_SHARE = 0.40
+ISOLATED_ROW_STRONG_SUPPORT = 15.0
 # An out-of-sequence serial with far less evidence than its row-mates is almost
 # always a fold that OCR once committed to, not a sticker moved from elsewhere.
 # A physically misplaced sticker still carries comparable ink and vote mass, so
@@ -878,7 +880,12 @@ def _unique_row_units(
 
 def decide_resolved(entry: dict, support_floor: float = 0.0) -> None:
     """Set whether this entry may be published, and with what label."""
-    if entry["serial_source"] == "row_tiebreak":
+    if entry["serial_source"] == "row_bracket":
+        # The row left exactly one opening and the pixels' own pick is the value
+        # that fills it.  Margin measures how hard the runner-up competed, which
+        # decides nothing once no other serial can sit here.
+        minimum_margin, minimum_support = 0.0, SEGMENTED_MIN_SUPPORT
+    elif entry["serial_source"] == "row_tiebreak":
         minimum_margin, minimum_support = TIEBREAK_MIN_MARGIN, SEGMENTED_MIN_SUPPORT
     elif entry["proposed"]:
         minimum_margin, minimum_support = PROPOSAL_MIN_MARGIN, PROPOSAL_MIN_SUPPORT
@@ -1058,6 +1065,24 @@ def settle_uncertain_serials(
             None,
         )
 
+        # The row leaves exactly one opening here: a single slot sitting
+        # between two published serials that are two apart.  No other value can
+        # go in it, whatever the pixels' runner-up was.
+        bracketed = (
+            left is not None
+            and right is not None
+            and right - left == 2
+            and 0 < index < len(entries) - 1
+            and bound_values[index - 1] == left
+            and bound_values[index + 1] == right
+        )
+
+        def _source(value: int) -> str:
+            return (
+                "row_bracket" if bracketed and value == left + 1
+                else "row_tiebreak"
+            )
+
         def _fits(value: int) -> bool:
             if value in taken or not low <= value <= high:
                 return False
@@ -1073,7 +1098,7 @@ def settle_uncertain_serials(
         # decide_resolved publish it instead of discarding a reading that
         # already fits every row constraint.
         if current is not None and _fits(current):
-            entry["serial_source"] = "row_tiebreak"
+            entry["serial_source"] = _source(current)
             entry.pop("withdrawn", None)
             taken.add(current)
             continue
@@ -1096,7 +1121,7 @@ def settle_uncertain_serials(
                 continue
             if candidate != entry["serial"]:
                 entry["serial"] = candidate
-            entry["serial_source"] = "row_tiebreak"
+            entry["serial_source"] = _source(value)
             entry.pop("withdrawn", None)
             taken.add(value)
             break
@@ -1308,7 +1333,19 @@ def withdraw_isolated_row(entries: list[dict]) -> None:
         len(entries) <= ISOLATED_ROW_MAX_SLOTS
         and len(resolved) <= ISOLATED_ROW_MAX_RESOLVED
     )
-    if not single_weak and not short_sparse:
+    # A shelf row reads across its whole span; a fold puts one lucky label among
+    # slots that never read at all.  Judging by the share that read catches a
+    # fold of any width, where a fixed slot count only catches a narrow one.
+    # A single strong reading is enough to keep the row, so a genuinely
+    # occluded shelf is not thrown away along with the folds.
+    sparse_read = (
+        len(resolved) < len(entries) * ISOLATED_ROW_MIN_READ_SHARE
+        and all(
+            entry["serial_support"] < ISOLATED_ROW_STRONG_SUPPORT
+            for entry in resolved
+        )
+    )
+    if not single_weak and not short_sparse and not sparse_read:
         return
     # A short row is still trusted when every resolved sticker is strongly
     # supported -- that is a clipped end of a real shelf, not a fold.

@@ -176,6 +176,11 @@ def locate_stickers(image: np.ndarray) -> list[dict]:
             continue
         if box_width / box_height < 0.75:
             continue
+        # A plate the frame edge cuts through shows only part of its text, and
+        # the stump measures as a smaller sticker than it is -- which then
+        # skews the size unit the touching-neighbour split relies on.
+        if x <= 0 or y <= 0 or x + box_width >= width or y + box_height >= height:
+            continue
         blobs.append({
             "box": (x, y, box_width, box_height),
             "quad": order_quad(cv2.boxPoints(cv2.minAreaRect(contour))),
@@ -206,8 +211,26 @@ def _cut_quad(quad: np.ndarray, parts: int, index: int) -> np.ndarray:
     ], dtype=np.float32)
 
 
+def _sticker_unit_height(blobs: list[dict]) -> float:
+    """Height of one sticker, judged from the blobs that hold exactly one.
+
+    A blob that merged several stickers is taller as well as wider, because it
+    takes in the book spine under them.  Its own height is therefore the wrong
+    unit to count stickers by -- it would halve the count of the very blobs
+    that need cutting -- so the height is taken from elsewhere in the frame.
+    """
+    singles = [
+        blob["box"][3] for blob in blobs
+        if blob["box"][2] / max(1, blob["box"][3]) <= STICKER_ASPECT_RATIO * 1.45
+    ]
+    if singles:
+        return float(np.median(singles))
+    return float(np.median([blob["box"][3] for blob in blobs])) if blobs else 0.0
+
+
 def _split_touching(blobs: list[dict]) -> list[dict]:
     """Cut blobs that merged several stickers, using same-row median width."""
+    unit_height = _sticker_unit_height(blobs)
     result: list[dict] = []
     for blob in blobs:
         x, y, box_width, box_height = blob["box"]
@@ -221,7 +244,13 @@ def _split_touching(blobs: list[dict]) -> list[dict]:
             <= STICKER_ASPECT_RATIO * 1.45
         ]
         reference_width = float(np.median([p[0] for p in peers])) if peers else 0.0
-        aspect_parts = box_width / max(box_height * STICKER_ASPECT_RATIO, 1.0)
+        # Sticker size varies several-fold across the frame with shelf distance,
+        # so the unit comes from this blob's own row where that row still holds
+        # an uncut sticker.  Only a row merged end to end -- which is where the
+        # blob's own height is least trustworthy -- falls back to the frame.
+        local_height = float(np.median([p[1] for p in peers])) if peers else 0.0
+        reference_height = min(box_height, local_height or unit_height or box_height)
+        aspect_parts = box_width / max(reference_height * STICKER_ASPECT_RATIO, 1.0)
         width_parts = box_width / reference_width if reference_width else 1.0
         parts = int(np.clip(np.floor(max(aspect_parts, width_parts) + 0.5), 1, 8))
         step = box_width / parts

@@ -19,7 +19,7 @@ WORK = Path(os.environ.get("LABEL_DATA", HERE))
 # figure name -> (video, frame index; -1 for the final settled frame)
 FIGURES = {
     "best_A5_light_head": ("A5_A4-5__light_head.mp4", -1),
-    "fail_A2_light_head": ("A2__light_head.mp4", -1),
+    "solved_A2_light_head": ("A2__light_head.mp4", -1),
     "hard_A2_dark_head_frame1": ("A2__dark_head.mp4", 0),
     "hard_A2_dark_head_final": ("A2__dark_head.mp4", -1),
     "near_A3-4_light_base": ("A3-4__light_base.mp4", -1),
